@@ -55,4 +55,30 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").isNotEmpty());
     }
+
+    @Test
+    void loginReturnsUserAndLogoutClearsSession() throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"연결테스터","email":"connect@example.com","password":"password123"}
+                                """))
+                .andExpect(status().isCreated());
+
+        MockHttpSession session = new MockHttpSession();
+        mockMvc.perform(post("/api/auth/login")
+                        .session(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"connect@example.com","password":"password123"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.name").value("연결테스터"));
+
+        mockMvc.perform(post("/api/auth/logout").session(session))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/me").session(session))
+                .andExpect(status().isUnauthorized());
+    }
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import type { AuthUser } from '../../auth/auth-context'
+import { apiFetch, apiUrl } from '../../lib/api'
 
-type Props = { mode: 'login' | 'signup'; onClose: () => void }
+type Props = { mode: 'login' | 'signup'; onClose: () => void; onAuthenticated: (user: AuthUser) => void }
 
-export function AuthModal({ mode, onClose }: Props) {
+export function AuthModal({ mode, onClose, onAuthenticated }: Props) {
   const isSignup = mode === 'signup'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -13,11 +15,11 @@ export function AuthModal({ mode, onClose }: Props) {
   const [message, setMessage] = useState('')
   const [isError, setIsError] = useState(false)
 
-  const googleUrl = import.meta.env.VITE_GOOGLE_SSO_URL || 'http://localhost:8080/oauth2/authorization/google'
-  const kakaoUrl = import.meta.env.VITE_KAKAO_SSO_URL || 'http://localhost:8080/oauth2/authorization/kakao'
+  const googleUrl = import.meta.env.VITE_GOOGLE_SSO_URL || apiUrl('/oauth2/authorization/google')
+  const kakaoUrl = import.meta.env.VITE_KAKAO_SSO_URL || apiUrl('/oauth2/authorization/kakao')
   const authUrl = isSignup
-    ? import.meta.env.VITE_SIGNUP_URL || 'http://localhost:8080/api/auth/signup'
-    : import.meta.env.VITE_LOGIN_URL || 'http://localhost:8080/api/auth/login'
+    ? '/api/auth/signup'
+    : '/api/auth/login'
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
@@ -39,17 +41,18 @@ export function AuthModal({ mode, onClose }: Props) {
 
     setIsSubmitting(true)
     try {
-      const response = await fetch(authUrl, {
+      const response = await apiFetch(authUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(isSignup ? { name, email, password } : { email, password }),
       })
-      const data = await response.json().catch(() => null) as { message?: string } | null
+      const data = await response.json().catch(() => null) as { message?: string; user?: AuthUser } | null
       if (!response.ok) throw new Error(data?.message || (isSignup ? '회원가입에 실패했습니다.' : '로그인에 실패했습니다.'))
+      if (!data?.user) throw new Error('서버에서 사용자 정보를 받지 못했습니다.')
 
       setMessage(data?.message || (isSignup ? '회원가입이 완료되었습니다.' : '로그인되었습니다.'))
-      window.dispatchEvent(new CustomEvent('auth:success'))
+      onAuthenticated(data.user)
+      onClose()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '요청을 처리하지 못했습니다.')
       setIsError(true)

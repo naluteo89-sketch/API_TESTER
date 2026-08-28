@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { temporaryPosts } from '../data/posts'
 import type { Post } from '../data/posts'
+import { apiFetch } from '../lib/api'
 
 type PostsResponse = Post[] | { content?: Post[]; posts?: Post[] }
 
@@ -18,11 +19,9 @@ export function usePosts() {
 
   useEffect(() => {
     const controller = new AbortController()
-    const postsUrl = import.meta.env.VITE_POSTS_API_URL || '/api/posts'
-
     async function loadPosts() {
       try {
-        const response = await fetch(postsUrl, { signal: controller.signal, credentials: 'include' })
+        const response = await apiFetch('/api/posts', { signal: controller.signal })
         if (!response.ok) throw new Error('게시글을 불러오지 못했습니다.')
         const realPosts = extractPosts(await response.json() as PostsResponse)
         setPosts(realPosts.length > 0 ? realPosts : temporaryPosts)
